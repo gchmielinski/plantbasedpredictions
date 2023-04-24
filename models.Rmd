@@ -1,0 +1,136 @@
+---
+title: "Untitled"
+author: "Grace Chmielinski"
+date: "2023-04-21"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# load data
+df <- read.csv("~/Documents/SPRING2023/Capstone/plantbasedpredictions/clean.csv")
+df <- na.omit(df)
+```
+
+```{r}
+library(caret)
+set.seed(0)
+
+# logistic regression
+(mean(df$MEATALTPCT))
+df$likelyYes <- ifelse(df$MEATALTPCT > mean(df$MEATALTPCT), 1, 0)
+train_set <- createDataPartition(df$likelyYes, p = .8, list = FALSE)
+train <- df[train_set,]
+test <- df[-train_set,]
+
+logistic <- glm(likelyYes ~ URBANPROP+MEDHHINC+ POVPROP+FOODCPI+LAPOPHALF+LAPOP1+FOODHOME, data = train, family = "binomial")
+
+testX <- test[,c("URBANPROP","MEDHHINC", "POVPROP","FOODCPI","LAPOPHALF","LAPOP1","FOODHOME")]
+testY <- test[,"likelyYes"]
+
+predictions <- predict(logistic, testX, type = "response")
+predictions$class <- ifelse(predictions > 0.5, 1, 0)
+
+confusionMatrix(as.factor(predictions$class), as.factor(testY))
+summary(logistic)
+```
+
+```{r}
+# set up cross validation for logistic regression and SVM
+library(e1071)
+
+# tune svm on training dataset
+set.seed(0)
+tune.out=
+    tune(svm,likelyYes ~ URBANPROP + MEDHHINC + POVPROP + FOODCPI + 
+        LAPOPHALF + LAPOP1 + FOODHOME,data=train , kernel = "linear", ranges
+         =list(cost=c(0.001,0.01,0.1, 1,5,10,100)))
+summary(tune.out)
+
+bestmod <- tune.out$best.model
+summary (bestmod)
+
+predictions1 <- predict(bestmod, testX, type = "response")
+predictions1$class <- ifelse(predictions1 > 0.5, 1, 0)
+confusionMatrix(as.factor(predictions1$class), as.factor(testY))
+```
+
+```{r}
+library(ROCR)
+
+pred_svm <- prediction(predictions1$class, as.factor(testY))
+pred_log <- prediction(predictions$class, as.factor(testY))
+perform_svm <- performance(pred_svm, "tpr", "fpr")
+perform_log <- performance(pred_log, "tpr", "fpr")
+
+plot(perform_svm, main="ROC Curve", col="blue")
+plot(perform_log, add = TRUE, col = "red")
+abline(a = 0, b = 1, col = "gray", lty=2)
+
+legend("bottomright", legend = c("SVM", "Logistic Regression"), col = c("blue", "red"), lwd = 2)
+```
+
+```{r}
+library(maps) 
+library(tidyverse) 
+# library(mgcv)
+
+train <- na.omit(train)
+
+# determine correct degrees of freedom 
+urban_df <- lm(MEATALTPCT ~ poly(URBANPROP, 6), data = train) #5 df
+medhhinc_df <- lm(MEATALTPCT ~ poly(MEDHHINC, 6), data = train) # 5 df
+poverty_df <- lm(MEATALTPCT ~ poly(POVPROP, 6), data = train) # 6 df
+foodcpi_df <- lm(MEATALTPCT ~ poly(FOODCPI, 6), data = train) # 2 df
+lapophalf_df <- lm(MEATALTPCT ~ poly(LAPOPHALF, 6), data = train) # 3 df
+lapop1_df <- lm(MEATALTPCT ~ poly(LAPOP1, 6), data = train) # 4 df
+foodhome_df <- lm(MEATALTPCT ~ poly(FOODHOME, 6), data = train) # 5 df
+
+# coef(summary(urban_df))
+# coef(summary(medhhinc_df))
+# coef(summary(poverty_df))
+# coef(summary(foodcpi_df))
+# coef(summary(lapophalf_df))
+# coef(summary(lapop1_df))
+# coef(summary(foodhome_df))
+```
+
+```{r}
+library(mgcv)
+set.seed(0)
+train_set <- createDataPartition(df$MEATALTPCT, p = .8, list = FALSE)
+train <- df[train_set,]
+test <- df[-train_set,]
+
+testX <- test[,c("URBANPROP","MEDHHINC", "POVPROP","FOODCPI","LAPOPHALF","LAPOP1","FOODHOME")]
+testY <- test[,"MEATALTPCT"]
+
+gam_mod <- gam(MEATALTPCT ~ s(POVPROP, 6)
+               + s(MEDHHINC, 5) + s(URBANPROP, 6) + s(FOODCPI, 2)
+                +s(FOODHOME, 5) +s(LAPOPHALF, 3) + s(LAPOP1, 1), # +s(LONG,LAT),
+               data = train)
+
+# gam_mod2 <- gam(MEATALTPCT ~ s(LAT,LONG), data = train)
+# summary(gam_mod2)
+summary(gam_mod)
+par(mfrow=c(3,2))
+plot(gam_mod, se = TRUE, col = "blue")
+
+summary(gam_mod)
+preds <- predict(gam_mod, newdata = testX)
+MSE <- mean((testY - preds)^2)
+
+# +s(MEDHHINC, 5)+ s(POVPROP, 6)+s(FOODCPI, 2)+s(LAPOPHALF, 3)+s(LAPOP1, 1)+s(FOODHOME, 5)+s(LAT,LONG)
+```
+
+```{r}
+linear_mod <- lm(MEATALTPCT ~ URBANPROP + MEDHHINC + POVPROP + FOODCPI + 
+        LAPOPHALF + LAPOP1 + FOODHOME,data=train)
+summary(linear_mod)
+preds <- predict(linear_mod, newdata = testX)
+MSE <- mean((testY - preds)^2)
+```
+
