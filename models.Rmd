@@ -16,6 +16,19 @@ df <- na.omit(df)
 ```
 
 ```{r}
+# Wilkes-Shapiro Test for Normality
+shapiro.test(df[,4])
+shapiro.test(df[,5])
+shapiro.test(df[,6])
+shapiro.test(df[,7])
+shapiro.test(df[,8])
+shapiro.test(df[,9])
+shapiro.test(df[,10])
+shapiro.test(df[,11])
+```
+
+
+```{r}
 library(caret)
 set.seed(0)
 
@@ -51,7 +64,7 @@ tune.out=
 summary(tune.out)
 
 bestmod <- tune.out$best.model
-summary (bestmod)
+summary(bestmod)
 
 predictions1 <- predict(bestmod, testX, type = "response")
 predictions1$class <- ifelse(predictions1 > 0.5, 1, 0)
@@ -60,7 +73,7 @@ confusionMatrix(as.factor(predictions1$class), as.factor(testY))
 
 ```{r}
 library(ROCR)
-
+# 
 pred_svm <- prediction(predictions1$class, as.factor(testY))
 pred_log <- prediction(predictions$class, as.factor(testY))
 perform_svm <- performance(pred_svm, "tpr", "fpr")
@@ -70,7 +83,8 @@ plot(perform_svm, main="ROC Curve", col="blue")
 plot(perform_log, add = TRUE, col = "red")
 abline(a = 0, b = 1, col = "gray", lty=2)
 
-legend("bottomright", legend = c("SVM", "Logistic Regression"), col = c("blue", "red"), lwd = 2)
+legend("bottomright", legend = c("SVM", "Logistic Regression", "No Information Rate"), col = c("blue", "red", "gray"), lty = c(1, 1, 2), lwd = 2)
+
 ```
 
 ```{r}
